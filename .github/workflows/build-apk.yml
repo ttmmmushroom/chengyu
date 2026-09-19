@@ -1,6 +1,6 @@
 name: Build APK
 
-# 一键出包：推送到 main 或手动触发后，自动构建可安装的 APK 并作为 Artifact 提供下载。
+# 一键出包：推送到 main/master 或手动触发后，自动构建可安装的 APK 并作为 Artifact 提供下载。
 on:
   push:
     branches: [ main, master ]
@@ -24,14 +24,10 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept SDK licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install SDK packages
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+      - name: Accept SDK licenses & install packages
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Copy web assets into APK
         run: |
