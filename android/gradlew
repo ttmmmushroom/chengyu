@@ -1,0 +1,28 @@
+#!/bin/sh
+# Minimal Gradle Wrapper launcher (POSIX).
+# 仅负责启动 org.gradle.wrapper.GradleWrapperMain，
+# 由它按 gradle/wrapper/gradle-wrapper.properties 中的 distributionUrl 下载并运行对应 Gradle。
+set -e
+
+# 解析符号链接，定位脚本真实位置
+PRG="$0"
+while [ -h "$PRG" ]; do
+  ls=$(ls -ld "$PRG")
+  link=$(expr "$ls" : '.*-> \(.*\)$')
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG="$(dirname "$PRG")/$link"
+  fi
+done
+
+APP_HOME="$(cd "$(dirname "$PRG")" && pwd)"
+CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+
+if [ -n "$JAVA_HOME" ]; then
+  JAVACMD="$JAVA_HOME/bin/java"
+else
+  JAVACMD="java"
+fi
+
+exec "$JAVACMD" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"

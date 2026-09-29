@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>好词好句收集本</title>
+<meta name="theme-color" content="#efe9e1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="好词好句">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #efe9e1;
+    --ink: #2d2a26;
+    --ink-light: #9a948a;
+    --accent: #b07d4f;
+    --accent-soft: #f3e8dc;
+    --line: #e7e1d8;
+    --card: #fffdfa;
+    --danger: #c0564f;
+    --shadow: 0 12px 40px rgba(70,50,30,.16);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink); overflow: hidden;
+  }
+
+  /* 极简顶栏 */
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: flex-end;
+    padding: calc(16px + env(safe-area-inset-top)) 18px 16px; pointer-events: none;
+  }
+  .top-actions { position: relative; display: flex; gap: 8px; pointer-events: auto; }
+  .top-menu { display: flex; gap: 8px; align-items: center; }
+  .menu-toggle { display: none; }
+  .icon-btn {
+    width: 42px; height: 42px; border-radius: 50%;
+    border: 1px solid rgba(231,225,216,.8); background: rgba(255,253,250,.85);
+    backdrop-filter: blur(6px); font-size: 18px; color: var(--ink); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all .2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .icon-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .icon-btn.add { background: var(--accent); color: #fff; border-color: var(--accent); font-size: 22px; }
+  .icon-btn.add:hover { background: #9a6a40; }
+
+  /* 进度 */
+  .counter {
+    position: absolute; top: calc(18px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 20;
+    color: var(--ink-light); font-size: 13px; letter-spacing: 2px;
+    background: rgba(255,253,250,.7); padding: 4px 14px; border-radius: 20px; backdrop-filter: blur(6px);
+  }
+
+  /* 全屏卡片 */
+  #cardView { position: absolute; inset: 0; }
+  .deck { position: absolute; inset: 0; }
+  .card {
+    position: absolute; inset: 14px; margin: auto;
+    width: min(680px, calc(100% - 28px)); height: auto; max-height: calc(100% - 28px);
+    background: var(--card); border-radius: 26px;
+    box-shadow: var(--shadow); border: 1px solid #efe9e0;
+    padding: clamp(28px, 5vh, 56px) clamp(22px, 4vw, 48px);
+    display: flex; flex-direction: column;
+    transition: transform .38s cubic-bezier(.2,.8,.3,1), opacity .38s;
+    will-change: transform; overflow: hidden; touch-action: pan-y;
+  }
+  .card.dragging { transition: none; }
+  .card.passed { transform: translateX(115%) rotate(7deg) !important; opacity: 0 !important; }
+  .card.passed-left { transform: translateX(-115%) rotate(-7deg) !important; opacity: 0 !important; }
+
+  .card .word {
+    font-family: "Songti SC","STSong","SimSun",serif;
+    font-size: clamp(40px, 9vh, 68px); font-weight: 700; color: var(--accent);
+    letter-spacing: 6px; text-align: center; line-height: 1.2; margin: 6px 0 2px;
+  }
+  .card .pos-badge {
+    align-self: center; margin: 4px 0 2px;
+    background: var(--accent-soft); color: #8a5c30; font-size: 13px; padding: 3px 14px; border-radius: 20px;
+  }
+  .card .pos-badge.pos-good { background: #e6f3ea; color: #2f8a4e; }
+  .card .pos-badge.pos-bad  { background: #f7e6e4; color: #c0564f; }
+  .card .pos-badge.pos-mid  { background: #eef0f2; color: #6b7280; }
+  .pos-good { color: #2f8a4e !important; }
+  .pos-bad  { color: #c0564f !important; }
+  .pos-mid  { color: #6b7280 !important; }
+  .card .pron { text-align: center; color: var(--ink-light); font-size: clamp(15px,2.2vh,18px); margin-bottom: clamp(14px,3vh,26px); letter-spacing: 1px; }
+  .card .rows { flex: 1; overflow-y: auto; padding: 4px 2px 0; }
+  .field { display: flex; gap: 14px; padding: clamp(12px,2vh,18px) 0; border-bottom: 1px dashed var(--line); }
+  .field:last-child { border-bottom: none; }
+  .field .label { flex: 0 0 56px; font-size: 12.5px; color: var(--ink-light); padding-top: 3px; letter-spacing: 2px; }
+  .field .value { flex: 1; font-size: clamp(15px,2.3vh,18px); line-height: 1.85; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+  .field.quote .value { font-family: "Songti SC","STSong","SimSun",serif; font-style: italic; background: #faf6f0; padding: 12px 16px; border-radius: 12px; border-left: 3px solid var(--accent-soft); }
+  .field.source .value { font-size: clamp(13px,1.9vh,15px); color: #6f6a62; }
+  .card .card-foot { display: flex; justify-content: flex-end; padding-top: 14px; }
+  .card .card-edit { font-size: 13px; color: var(--ink-light); cursor: pointer; }
+  .card .card-edit:hover { color: var(--accent); }
+  .mean-src { font-size: 11px; color: var(--ink-light); margin-top: 7px; letter-spacing: .5px; }
+  .empty-deck { text-align:center; color: var(--ink-light); display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; font-size:16px; letter-spacing:2px; gap:10px; }
+
+  /* 悬浮左右箭头 */
+  .nav-btn {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 22;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,253,250,.5); border: 1px solid rgba(0,0,0,.06);
+    font-size: 26px; line-height: 1; color: var(--accent); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06); transition: opacity .2s, transform .2s; opacity: .55;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-btn:hover { transform: translateY(-50%) scale(1.08); opacity: 1; }
+  .nav-btn:active { transform: translateY(-50%) scale(.92); opacity: 1; }
+  .nav-btn.prev { left: 8px; }
+  .nav-btn.next { right: 8px; }
+
+  /* 底部常驻操作条 */
+  .bottombar {
+    position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 25;
+    display: flex; gap: 3px; background: rgba(255,253,250,.97); border: 1px solid var(--line);
+    border-radius: 26px; padding: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.14); backdrop-filter: blur(8px);
+    max-width: calc(100% - 16px);
+  }
+  .bottombar button {
+    border: none; background: none; cursor: pointer; font-size: 15px; color: var(--ink); font-weight: 500;
+    padding: 10px 15px; border-radius: 18px; display: flex; align-items: center; gap: 5px; transition: all .2s; font-family: inherit; white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bottombar button:hover { background: var(--accent-soft); color: var(--accent); }
+  .bottombar button.primary { background: var(--accent); color: #fff; }
+  .bottombar button.primary:hover { background: #9a6a40; }
+
+  /* 列表视图 / 辨析视图（全屏覆盖） */
+  #listView, #discrimView {
+    position: absolute; inset: 0; z-index: 40; background: var(--bg);
+    display: none; flex-direction: column; padding: 16px 18px 20px; overflow-y: auto;
+  }
+  #listView.show, #discrimView.show { display: flex; }
+  .list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .list-head h2 { font-family: "Songti SC","STSong","SimSun",serif; font-size: 19px; letter-spacing: 3px; color: var(--accent); }
+  .search-box { position: relative; margin-bottom: 16px; }
+  .search-box input {
+    width: 100%; padding: 12px 14px 12px 38px; border: 1px solid var(--line);
+    border-radius: 14px; background: var(--card); font-size: 14px; outline: none; transition: border-color .2s;
+  }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box::before { content: "🔍"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); opacity: .5; font-size: 14px; }
+  .list-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  @media (max-width: 560px) { .list-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 340px) { .list-grid { grid-template-columns: 1fr; } }
+  .mini-card { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 10px 11px; cursor: pointer; transition: all .2s; }
+  .mini-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+  .mini-card .mc-word { font-family: "Songti SC","STSong","SimSun",serif; font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+  .mini-card .mc-pos { text-align: center; font-size: 12px; margin: 2px 0 4px; letter-spacing: 1px; }
+  .mini-card .mc-pos.pos-good { color: #2f8a4e; }
+  .mini-card .mc-pos.pos-bad { color: #c0564f; }
+  .mini-card .mc-pos.pos-mid { color: #9aa1a8; }
+  .mini-card .mc-top { text-align: center; margin-bottom: 6px; }
+  .mini-card .mc-foot { display: flex; justify-content: flex-end; gap: 6px; }
+  .mini-card .mc-foot button { background: none; border: none; color: var(--ink-light); font-size: 12px; cursor: pointer; padding: 1px 3px; }
+  .mini-card .mc-foot button:hover { color: var(--accent); }
+  .mini-card .mc-foot button.del:hover { color: var(--danger); }
+  .list-empty { text-align: center; color: var(--ink-light); padding: 60px 20px; font-size: 14px; letter-spacing: 1px; }
+
+  /* 弹窗 */
+  .modal-mask { display: none; position: fixed; inset: 0; background: rgba(45,42,38,.42); z-index: 100; align-items: flex-end; justify-content: center; }
+  .modal-mask.show { display: flex; }
+  @media (min-width: 600px) { .modal-mask { align-items: center; } }
+  .modal { background: var(--card); width: 100%; max-width: 560px; border-radius: 22px 22px 0 0; padding: 24px 24px 28px; max-height: 92vh; overflow-y: auto; animation: up .3s ease; }
+  @media (min-width: 600px) { .modal { border-radius: 22px; } }
+  @keyframes up { from { transform: translateY(40px); opacity: .6; } to { transform: translateY(0); opacity: 1; } }
+  .modal h2 { font-family: "Songti SC","STSong","SimSun",serif; font-size: 19px; letter-spacing: 3px; margin-bottom: 18px; color: var(--accent); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .fill-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; margin-bottom: 14px; background: #faf6f0; border: 1px solid var(--line); border-radius: 12px; font-size: 12.5px; color: #7a7066; line-height: 1.5; }
+  .fill-bar .btn-ghost { white-space: nowrap; flex: 0 0 auto; padding: 8px 14px; }
+  @media (max-width: 380px) { .fill-bar { flex-direction: column; align-items: stretch; } }
+  .field-in label { display: block; font-size: 13px; color: var(--ink-light); margin-bottom: 5px; }
+  .field-in input, .field-in textarea, .field-in select { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-family: inherit; color: var(--ink); outline: none; background: #fdfcfa; transition: border-color .2s; }
+  .field-in input:focus, .field-in textarea:focus { border-color: var(--accent); }
+  .field-in textarea { resize: vertical; min-height: 60px; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  button { border: none; cursor: pointer; font-size: 14px; border-radius: 11px; padding: 11px 20px; transition: all .2s; font-family: inherit; }
+  .btn-primary { background: var(--accent); color: #fff; font-weight: 500; }
+  .btn-primary:hover { background: #9a6a40; }
+  .btn-ghost { background: transparent; color: var(--ink-light); border: 1px solid var(--line); }
+  .btn-ghost:hover { color: var(--accent); border-color: var(--accent); }
+
+  #colModal .modal { max-width: 480px; }
+  .col-item { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .col-item input { flex: 1; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; outline: none; }
+  .col-item .del-col { background: none; border: none; color: var(--ink-light); font-size: 18px; cursor: pointer; }
+  .col-item .del-col:hover { color: var(--danger); }
+  .col-item .req-tag { font-size: 12px; color: var(--ink-light); }
+
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 11px 22px; border-radius: 24px; font-size: 14px; opacity: 0; pointer-events: none; transition: all .3s; z-index: 200; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 分类筛选 */
+  .cat-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .cat-chip { font-size: 13px; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--line); background: var(--card); color: var(--ink-light); cursor: pointer; transition: all .2s; }
+  .cat-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .cat-group-title { grid-column: 1 / -1; font-size: 13px; color: var(--ink-light); letter-spacing: 1px; margin: 6px 0 2px; padding-left: 2px; }
+  .cat-tag { display: inline-block; font-size: 11px; color: var(--accent); background: var(--accent-soft); padding: 1px 8px; border-radius: 10px; margin-left: 6px; }
+  .card .cat-flag { align-self: center; margin: 2px 0; font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 2px 10px; border-radius: 12px; }
+
+  /* 连连看 */
+  .game-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 13px; color: var(--ink-light); }
+  .game-board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; position: relative; }
+  @media (max-width: 480px) { .game-board { grid-template-columns: repeat(3, 1fr); } }
+  .gtile {
+    min-height: 58px; padding: 8px 6px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); display: flex; align-items: center; justify-content: center; text-align: center;
+    font-size: 13.5px; line-height: 1.4; cursor: pointer; transition: all .18s; word-break: break-word; user-select: none;
+  }
+  .gtile:hover { border-color: var(--accent); }
+  .gtile.word { font-family: "Songti SC","STSong","SimSun",serif; font-weight: 700; font-size: 17px; color: var(--accent); }
+  .gtile.sel { background: var(--accent); color: #fff; border-color: var(--accent); transform: scale(1.04); }
+  .gtile.bad { animation: shake .35s; border-color: var(--danger); }
+  .gtile.gone { visibility: hidden; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+  .game-link { position: absolute; background: var(--accent); height: 3px; transform-origin: left center; border-radius: 3px; pointer-events: none; opacity: .8; z-index: 5; }
+
+  /* 词语辨析 */
+  .btn-sm { padding: 8px 14px; font-size: 13px; }
+  .disc-group { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 16px 18px; margin-bottom: 16px; }
+  .disc-group-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .disc-group-head h3 { font-family: "Songti SC","STSong","SimSun",serif; font-size: 16px; letter-spacing: 1px; color: var(--accent); font-weight: 600; }
+  .disc-group-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .disc-group-actions .del { color: var(--danger); }
+  .disc-group-actions .del:hover { border-color: var(--danger); color: var(--danger); }
+  .disc-items { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .disc-items { grid-template-columns: 1fr; } }
+  .disc-card { position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .disc-card-word { font-family: "Songti SC","STSong","SimSun",serif; font-size: 20px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+  .disc-card-pron { font-size: 12.5px; color: var(--ink-light); margin-top: 2px; }
+  .disc-card-mean { font-size: 13px; color: #555; line-height: 1.65; margin-top: 8px; }
+  .disc-remove { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--ink-light); font-size: 14px; cursor: pointer; line-height: 1; }
+  .disc-remove:hover { color: var(--danger); }
+
+  /* ===== 手机端优化（仅窄屏生效，不影响桌面） ===== */
+  @media (max-width: 560px) {
+    /* 右上角按钮收纳：平时只显示一个 ⋯，点击向左展开 */
+    .topbar { padding: 11px 14px; }
+    .top-actions { gap: 6px; }
+    .icon-btn { width: 38px; height: 38px; font-size: 16px; border-radius: 50%; }
+    .icon-btn.add { font-size: 18px; }
+    .menu-toggle { display: flex; }
+    /* 收纳菜单：从 ⋯ 按钮向下弹出，竖排圆形按钮 */
+    .top-menu {
+      position: absolute; top: 46px; right: 0;
+      flex-direction: column; align-items: flex-end; gap: 8px;
+      opacity: 0; transform: translateY(-8px); pointer-events: none; transition: opacity .2s, transform .2s;
+    }
+    .top-menu.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    /* 卡片底部给操作条让位，避免编辑按钮被挡 */
+    .card { bottom: calc(14px + 72px); }
+    /* 底部操作条：缩小以放得下全部按钮，不溢出屏幕 */
+    .bottombar { gap: 2px; padding: 5px; bottom: calc(12px + env(safe-area-inset-bottom)); }
+    .bottombar button { font-size: 13.5px; padding: 9px 10px; gap: 4px; }
+    /* 全屏视图内边距收紧 + 底部安全区 */
+    #listView, #discrimView { padding: 12px 14px calc(22px + env(safe-area-inset-bottom)); }
+    .list-head h2 { font-size: 17px; }
+    /* 辨析视图：组卡片与成员卡更紧凑，组名独占一行、操作按钮换行，避免被挤到屏幕外 */
+    .disc-group { padding: 12px 13px 14px; margin-bottom: 12px; border-radius: 16px; }
+    .disc-group-head { flex-direction: column; align-items: stretch; gap: 8px; }
+    .disc-group-head h3 { max-width: 100%; word-break: break-word; }
+    .disc-group-actions { width: 100%; }
+    .disc-items { grid-template-columns: 1fr; gap: 10px; }
+    .disc-card { padding: 12px 14px; }
+    .disc-card-word { font-size: 18px; word-break: break-word; }
+    .disc-card-mean { font-size: 12.5px; }
+  }
+
+  /* 选择成语弹窗 */
+  .picker-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: all .15s; }
+  .picker-item:hover { border-color: var(--accent); }
+  .picker-item.added { background: var(--accent-soft); }
+  .picker-item .pi-word { font-family: "Songti SC","STSong","SimSun",serif; font-weight: 700; font-size: 17px; color: var(--accent); flex: 0 0 auto; }
+  .picker-item .pi-mean { flex: 1; font-size: 12.5px; color: #666; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .picker-item .pi-check { font-size: 13px; color: var(--ink-light); white-space: nowrap; }
+  .picker-item.added .pi-check { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- 极简顶栏 -->
+<div class="topbar">
+  <div class="top-actions">
+    <button class="icon-btn menu-toggle" title="更多操作" onclick="toggleTopMenu(event)">⋯</button>
+    <div class="top-menu" id="topMenu">
+      <button class="icon-btn" title="云同步" onclick="openCloudModal();closeTopMenu()">☁</button>
+      <button class="icon-btn" title="管理栏目" onclick="openColModal();closeTopMenu()">≡</button>
+      <button class="icon-btn add" title="收录新词" onclick="openAddModal();closeTopMenu()">＋</button>
+    </div>
+  </div>
+</div>
+<div class="counter" id="counter"></div>
+
+<!-- 全屏卡片 -->
+<div id="cardView">
+  <div class="deck" id="deck"></div>
+  <button class="nav-btn prev" title="上一个 (←)" onclick="prev()">‹</button>
+  <button class="nav-btn next" title="下一个 (→)" onclick="next()">›</button>
+  <div class="bottombar">
+    <button class="primary" onclick="buildDeck()" title="随机换一批卡片">🔄 换一批</button>
+    <button onclick="openList()">▦ 全部词语</button>
+    <button onclick="openGame()">🎮 游戏</button>
+    <button onclick="openDiscrim()">📑 辨析</button>
+  </div>
+</div>
+
+<!-- 全部词语 -->
+<div id="listView">
+  <div class="list-head">
+    <h2>全部词语</h2>
+    <button class="btn-ghost btn-sm" onclick="closeList()" style="padding:8px 16px;">✕ 返回</button>
+  </div>
+  <div class="search-box"><input id="searchInput" type="text" placeholder="搜索词语、来源、含义、例句…" oninput="renderList()"></div>
+  <div class="cat-filter" id="catFilter"></div>
+  <div class="list-grid" id="listGrid"></div>
+</div>
+
+<!-- 词语辨析 -->
+<div id="discrimView">
+  <div class="list-head">
+    <h2>词语辨析</h2>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-primary btn-sm" onclick="newGroup()">＋ 新建辨析组</button>
+      <button class="btn-ghost btn-sm" onclick="closeDiscrim()">✕ 返回</button>
+    </div>
+  </div>
+  <div id="discrimList"></div>
+</div>
+
+<!-- 录入弹窗 -->
+<div class="modal-mask" id="entryModal">
+  <div class="modal">
+    <h2 id="modalTitle">收录新词</h2>
+    <div class="fill-bar">
+      <span>输入词语后，可一键补全 含义 / 例句 / 来源 / 词性（查不到的留空）</span>
+      <button type="button" class="btn-ghost" onclick="fillCurrent()">🔄 自动补全</button>
+    </div>
+    <div class="form-grid" id="formFields"></div>
+    <div class="modal-foot">
+      <button class="btn-ghost" onclick="closeModal('entryModal')">取消</button>
+      <button class="btn-primary" onclick="saveEntry()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 栏目管理弹窗 -->
+<div class="modal-mask" id="colModal">
+  <div class="modal">
+    <h2>管理栏目</h2>
+    <p style="font-size:13px;color:var(--ink-light);margin-bottom:14px;">可重命名、删除栏目，或新增自定义栏目。「词语」为必需列，不可删除。</p>
+    <div id="colList"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <input id="newColName" type="text" placeholder="如：出处页码 / 备注 / 造句" onkeydown="if(event.key==='Enter')addColumn()">
+      <button class="btn-primary" style="white-space:nowrap" onclick="addColumn()">添加</button>
+    </div>
+    <div class="modal-foot"><button class="btn-primary" onclick="closeModal('colModal')">完成</button></div>
+  </div>
+</div>
+
+<!-- 云同步弹窗 -->
+<div class="modal-mask" id="cloudModal">
+  <div class="modal">
+    <h2>云同步</h2>
+
+    <div style="background:#faf6f0;border-radius:12px;padding:12px 14px;font-size:12.5px;color:#7a7066;line-height:1.7;margin-bottom:16px;">
+      自动云存档使用 <b>GitHub Gist</b>（免费、浏览器直连、手机/电脑通用）。夸克网盘暂无官方开放接口，无法在前端自动同步；如需用夸克，可用下方「导出文件」把备份存到夸克，换设备再「导入文件」即可。
+    </div>
+
+    <div class="field-in" style="margin-bottom:14px;">
+      <label>GitHub Token（仅本地保存）</label>
+      <input id="gistToken" type="password" placeholder="在 github.com → Settings → Tokens 新建，勾选 gist 权限" autocomplete="off">
+    </div>
+    <div class="field-in" style="margin-bottom:16px;">
+      <label>Gist ID（首次上传后自动记好，留空则新建）</label>
+      <input id="gistId" type="text" placeholder="可留空，上传后自动填入">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:18px;">
+      <button class="btn-primary" style="flex:1" onclick="cloudUpload()">↑ 上传备份</button>
+      <button class="btn-ghost" style="flex:1" onclick="cloudDownload()">↓ 下载恢复</button>
+    </div>
+
+    <div style="border-top:1px dashed var(--line);padding-top:14px;">
+      <div style="font-size:13px;color:var(--ink-light);margin-bottom:10px;">本地文件备份（可手动存到夸克网盘）</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-ghost" style="flex:1" onclick="exportJSON()">导出文件</button>
+        <button class="btn-ghost" style="flex:1" onclick="document.getElementById('importFile').click()">导入文件</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+      </div>
+    </div>
+
+    <div class="modal-foot"><button class="btn-primary" onclick="closeModal('cloudModal')">完成</button></div>
+  </div>
+</div>
+
+<!-- 连连看小游戏 -->
+<div class="modal-mask" id="gameModal">
+  <div class="modal" style="max-width:620px;">
+    <h2>连连看 · 词语配对</h2>
+    <p style="font-size:13px;color:var(--ink-light);margin-bottom:14px;">点一个<b>词语</b>，再点它对应的<b>含义</b>，配对成功即消除。把词和意思连起来记更牢～</p>
+    <div class="game-bar">
+      <span id="gameStat">已配对 0 / 0</span>
+      <button class="btn-ghost btn-sm" onclick="startGame()">🔀 重新洗牌</button>
+    </div>
+    <div class="game-board" id="gameBoard"></div>
+    <div class="game-win" id="gameWin" style="display:none;">
+      <div style="font-size:22px;margin-bottom:6px;">🎉 全部配对完成！</div>
+      <button class="btn-primary" onclick="startGame()">再来一局</button>
+    </div>
+    <div class="game-empty" id="gameEmpty" style="display:none;color:var(--ink-light);padding:30px 0;text-align:center;font-size:14px;">
+      还没有足够的词（至少需要 3 个带「含义」的词）。<br>先去收录几个吧！
+    </div>
+    <div class="modal-foot"><button class="btn-primary" onclick="closeModal('gameModal')">关闭</button></div>
+  </div>
+</div>
+
+<!-- 选择成语加入辨析组 -->
+<div class="modal-mask" id="pickerModal">
+  <div class="modal" style="max-width:560px;">
+    <h2>添加成语到辨析组</h2>
+    <p style="font-size:13px;color:var(--ink-light);margin-bottom:14px;">从你已收录的词语里挑选，加入这个辨析组，方便放在一起对比记忆。</p>
+    <div class="search-box"><input id="pickerSearch" type="text" placeholder="搜索要加入的词语…" oninput="renderPicker()"></div>
+    <div id="pickerList"></div>
+    <div class="modal-foot"><button class="btn-primary" onclick="closeModal('pickerModal'); renderDiscrim();">完成</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="pinyin-pro.js"></script>
+<script>
+const STORE_KEY = 'goodwords_v2';
+const DEFAULT_COLS = [
+  { key: 'c_source', name: '来源' },
+  { key: 'c_pron',   name: '读音' },
+  { key: 'c_pos',    name: '词性' },
+  { key: 'c_word',   name: '词语', required: true },
+  { key: 'c_mean',   name: '含义' },
+  { key: 'c_example',name: '例句' },
+  { key: 'c_cat',    name: '分类' },
+];
+const POS_OPTIONS = ['', '褒义词','贬义词','中性词'];
+function genId(p) { return (p||'r') + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+let state = load();
+let cur = 0;
+let deckSet = [];
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+    const s = JSON.parse(raw);
+    if (s && Array.isArray(s.cols) && Array.isArray(s.rows)) {
+      // 兼容旧数据：补齐默认栏目（如新增的「分类」）
+      DEFAULT_COLS.forEach(d => { if (!s.cols.find(c => c.key === d.key)) s.cols.push(d); });
+      s.rows.forEach(r => { if (!r.id) r.id = genId(); });
+      if (!Array.isArray(s.discrim)) s.discrim = [];
+      return s;
+    }
+  }
+  } catch (e) {}
+  const base = { cols: JSON.parse(JSON.stringify(DEFAULT_COLS)), rows: [
+    { c_source:'《韩非子·用人》："闻古之善用人者，必循天顺人而明赏罚。"', c_pron:'xún tiān shùn rén', c_pos:'褒义词',
+      c_word:'循天顺人', c_mean:'遵循自然规律，顺应民心。', c_example:'治国之道，当循天顺人，方能国泰民安。' },
+    { c_source:'（自拟）', c_pron:'liú zhuǎn gēng dié', c_pos:'中性词',
+      c_word:'流转更迭', c_mean:'时间推移、事物更替变换。', c_example:'岁月流转，四季更迭，唯有文字长存。' },
+    { c_source:'唐·杜甫《狂歌行赠四兄》', c_pron:'sì shí bā jié', c_pos:'中性词',
+      c_word:'四时八节', c_mean:'四时指春夏秋冬，八节指立春、春分、立夏、夏至、立秋、秋分、立冬、冬至。泛指一年四季。', c_example:'四时八节，风物各异，皆成佳趣。' },
+    { c_source:'《书·泰誓下》："作奇技淫巧，以悦妇人。"', c_pron:'qí jì yín qiǎo', c_pos:'贬义词',
+      c_word:'奇技淫巧', c_mean:'指新奇而无益的技艺与制品。', c_example:'真正的美在质朴中用，不在奇技淫巧间。' },
+  ]};
+  base.rows.forEach(r => r.id = genId());
+  base.discrim = [];
+  return base;
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+const WORD_COL = () => state.cols.find(c => c.required) || state.cols[3];
+const fieldLabel = (key) => { const c = state.cols.find(x => x.key === key); return c ? c.name : key; };
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1700); }
+
+/* 卡片渲染 */
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+// 随机推送 5~10 张卡片（不足则全部）
+function buildDeck() {
+  const n = state.rows.length;
+  if (n === 0) { deckSet = []; cur = 0; renderDeck(); return; }
+  const size = n <= 5 ? n : Math.min(n, 5 + Math.floor(Math.random() * 6)); // 5..10
+  const idx = shuffle(state.rows.map((_, i) => i)).slice(0, size);
+  deckSet = idx; cur = 0; renderDeck();
+}
+function renderDeck() {
+  const deck = document.getElementById('deck');
+  const counter = document.getElementById('counter');
+  if (deckSet.length === 0) {
+    deck.innerHTML = '<div class="empty-deck">还没有收录的词 📖<br><span style="font-size:14px;">点击右上角 ＋ 开始积累</span></div>';
+    counter.textContent = ''; return;
+  }
+  if (cur >= deckSet.length) cur = deckSet.length - 1;
+  if (cur < 0) cur = 0;
+  counter.textContent = `${cur + 1} / ${deckSet.length}`;
+  const r = state.rows[deckSet[cur]];
+  deck.innerHTML = buildCard(r, deckSet[cur]);
+  attachDrag(document.querySelector('.card'));
+}
+function buildCard(r, idx) {
+  const wcol = WORD_COL();
+  const word = esc(r[wcol.key] || '（未命名）');
+  const pos = esc(r.c_pos || '');
+  const posClass = pos.includes('褒') ? 'pos-good' : pos.includes('贬') ? 'pos-bad' : pos.includes('中') ? 'pos-mid' : '';
+  const pron = esc(r.c_pron || '');
+  const cat = esc(r.c_cat || '');
+  let rowsHtml = '';
+  state.cols.forEach(c => {
+    if (c.key === wcol.key) return;
+    const val = String(r[c.key] || '').trim(); if (!val) return;
+    let type = '';
+    if (fieldLabel(c.key) === '例句') type = 'quote';
+    if (fieldLabel(c.key) === '来源') type = 'source';
+    let srcTag = '';
+    if (c.key === 'c_mean' && r.c_mean_src) srcTag = `<div class="mean-src">释义来源：${esc(r.c_mean_src)}</div>`;
+    else if (c.key === 'c_example' && r.c_example_src) srcTag = `<div class="mean-src">例句来源：${esc(r.c_example_src)}</div>`;
+    else if (c.key === 'c_source' && r.c_source_src) srcTag = `<div class="mean-src">出处来源：${esc(r.c_source_src)}</div>`;
+    rowsHtml += `<div class="field ${type}"><div class="label">${esc(c.name)}</div><div class="value">${esc(val)}${srcTag}</div></div>`;
+  });
+  if (!rowsHtml) rowsHtml = '<div class="field"><div class="label">提示</div><div class="value">点右上角「管理栏目」添加更多字段～</div></div>';
+  return `<div class="card" data-idx="${idx}">
+    <div class="word">${word}</div>
+    ${pos ? `<div class="pos-badge ${posClass}">${pos}</div>` : ''}
+    ${cat ? `<div class="cat-flag">🏷 ${cat}</div>` : ''}
+    ${pron ? `<div class="pron">${pron}</div>` : ''}
+    <div class="rows">${rowsHtml}</div>
+    <div class="card-foot"><span class="card-edit" onclick="openEditModal(${idx})">✎ 编辑</span></div>
+  </div>`;
+}
+
+/* 滑动手势 */
+let drag = null;
+function attachDrag(card) {
+  if (!card) return;
+  card.addEventListener('pointerdown', onDown);
+  card.addEventListener('pointermove', onMove);
+  card.addEventListener('pointerup', onUp);
+  card.addEventListener('pointercancel', onUp);
+}
+function onDown(e) {
+  if (e.pointerType === 'touch') return; // 手机端去掉卡片滑动手势，改用左右箭头按钮 / 键盘翻页
+  if (state.rows.length === 0) return;
+  if (e.target.closest('.card-edit')) return; // 点编辑按钮时不启动拖拽，让它的点击正常触发
+  drag = { x0: e.clientX, x: e.clientX, card: e.currentTarget };
+  drag.card.classList.add('dragging');
+  try { drag.card.setPointerCapture(e.pointerId); } catch (_) {}
+}
+function onMove(e) {
+  if (!drag) return;
+  const dx = e.clientX - drag.x0; drag.x = e.clientX;
+  drag.card.style.transform = `translateX(${dx}px) rotate(${dx/22}deg)`;
+}
+function onUp() {
+  if (!drag) return;
+  const card = drag.card; card.classList.remove('dragging');
+  const dx = drag.x - drag.x0; const W = card.offsetWidth;
+  if (dx > W * 0.22) { card.classList.add('passed'); setTimeout(next, 180); }
+  else if (dx < -W * 0.22) { card.classList.add('passed-left'); setTimeout(prev, 180); }
+  else { card.style.transform = ''; }
+  drag = null;
+}
+function next() { if (cur < deckSet.length - 1) { cur++; renderDeck(); } else toast('已是本批最后一张，点「换一批」看新的'); }
+function prev() { if (cur > 0) { cur--; renderDeck(); } else toast('已是第一张'); }
+
+/* 列表视图 */
+let currentCat = '全部';
+function openList() { renderCatFilter(); renderList(); document.getElementById('listView').classList.add('show'); pushOverlay('listView'); }
+function closeList() { if (overlayStack[overlayStack.length-1]==='listView') history.back(); else document.getElementById('listView').classList.remove('show'); }
+function allCats() {
+  const s = new Set();
+  state.rows.forEach(r => { const c = (r.c_cat || '').trim(); if (c) s.add(c); });
+  return [...s];
+}
+function renderCatFilter() {
+  const box = document.getElementById('catFilter');
+  const cats = allCats();
+  let html = `<span class="cat-chip ${currentCat==='全部'?'active':''}" onclick="setCat('全部')">全部</span>`;
+  html += cats.map(c => `<span class="cat-chip ${currentCat===c?'active':''}" onclick="setCat('${esc(c)}')">${esc(c)}</span>`).join('');
+  box.innerHTML = cats.length ? html : '';
+}
+function setCat(cat) { currentCat = cat; renderCatFilter(); renderList(); }
+function renderList() {
+  const grid = document.getElementById('listGrid');
+  const q = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+  let rows = state.rows.map((r, i) => ({ r, i }));
+  if (currentCat !== '全部') rows = rows.filter(({ r }) => (r.c_cat || '').trim() === currentCat);
+  if (q) rows = rows.filter(({ r }) => state.cols.some(c => String(r[c.key] || '').toLowerCase().includes(q)));
+  if (rows.length === 0) { grid.innerHTML = '<div class="list-empty">没有找到匹配的内容</div>'; return; }
+  const wcol = WORD_COL();
+  // 按分类分组展示
+  const groups = {};
+  rows.forEach(o => { const k = (o.r.c_cat || '').trim() || '未分类'; (groups[k] = groups[k] || []).push(o); });
+  const order = ['未分类', ...allCats().filter(c => c !== '未分类')];
+  let html = '';
+  order.forEach(k => {
+    if (!groups[k]) return;
+    if (currentCat === '全部' && allCats().length) html += `<div class="cat-group-title">🏷 ${esc(k)}（${groups[k].length}）</div>`;
+    html += groups[k].map(({ r, i }) => {
+      const word = esc(r[wcol.key] || '（未命名）');
+      const pos = esc(r.c_pos || '');
+      const cat = esc(r.c_cat || '');
+      const wlen = word.length;
+      const wsize = wlen <= 2 ? 21 : wlen === 3 ? 19 : wlen === 4 ? 18 : wlen === 5 ? 16 : 15;
+      const posClass = pos.includes('褒') ? 'pos-good' : pos.includes('贬') ? 'pos-bad' : pos.includes('中') ? 'pos-mid' : '';
+      return `<div class="mini-card" onclick="goCard(${i})">
+        <div class="mc-top"><span class="mc-word" style="font-size:${wsize}px">${word}</span>${cat && currentCat!=='全部' ? `<span class="cat-tag">${cat}</span>` : ''}</div>
+        ${pos ? `<div class="mc-pos ${posClass}">${pos}</div>` : ''}
+        <div class="mc-foot">
+          <button onclick="event.stopPropagation();openEditModal(${i})">✎</button>
+          <button class="del" onclick="event.stopPropagation();deleteRow(${i})">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  });
+  grid.innerHTML = html;
+}
+function goCard(i) {
+  const n = state.rows.length;
+  if (n <= 1) { deckSet = [i]; cur = 0; }
+  else { const rest = shuffle(state.rows.map((_, k) => k).filter(k => k !== i)); deckSet = [i, ...rest]; cur = 0; }
+  closeList(); renderDeck();
+}
+
+/* 录入 / 编辑 */
+let editingIndex = null;
+function openAddModal() { editingIndex = null; document.getElementById('modalTitle').textContent = '收录新词'; buildForm({}); show('entryModal'); }
+function openEditModal(idx) { editingIndex = idx; document.getElementById('modalTitle').textContent = '编辑条目'; buildForm(state.rows[idx]); show('entryModal'); }
+function buildForm(row) {
+  const wrap = document.getElementById('formFields'); wrap.innerHTML = '';
+  state.cols.forEach(c => {
+    const v = String(row[c.key] || '');
+    const field = document.createElement('div');
+    field.className = 'field-in' + ((c.name==='含义'||c.name==='例句'||c.name==='来源') ? ' full' : '');
+    let input;
+    if (c.name === '词性') {
+      const da = (row.c_pos_src) ? '1' : (v.trim() ? '0' : '1');
+      input = `<select data-key="${c.key}" data-auto="${da}">${POS_OPTIONS.map(p=>`<option value="${p}" ${p===v?'selected':''}>${p||'（可不填）'}</option>`).join('')}</select>`;
+    }
+    else if (c.name==='含义'||c.name==='例句'||c.name==='来源') {
+      const ph = c.name==='例句' ? '自动生成，可手动修改' : '输入' + c.name + (c.name==='含义' || c.name==='来源' ? '（自动生成）' : '');
+      const da = (row[c.key+'_src']) ? '1' : (v.trim() ? '0' : '1');
+      input = `<textarea data-key="${c.key}" data-auto="${da}" placeholder="${ph}" oninput="fieldEdited(this)">${esc(v)}</textarea>`;
+    }
+    else if (c.name === '分类') input = `<input type="text" data-key="${c.key}" value="${esc(v)}" list="catList" placeholder="如：写景 / 励志 / 成语">`;
+    else {
+      let extra = '';
+      if (c.key === WORD_COL().key) extra = ' oninput="autoPron(this);autoMeanDebounced(this)" onblur="autoMean(this)"';
+      else if (c.key === 'c_pron') extra = ' oninput="this.dataset.auto=\'0\'"';
+      const ph = c.key === 'c_pron' ? '自动生成，可手动修改' : '输入' + c.name;
+      input = `<input type="text" data-key="${c.key}" value="${esc(v)}" placeholder="${ph}"${extra}>`;
+    }
+    field.innerHTML = `<label>${c.name}${c.required?'（必填）':''}</label>${input}`;
+    wrap.appendChild(field);
+  });
+  // 自动生成字段的来源标记（手动改后清空，切换词语时重新填）
+  ['c_mean_src','c_example_src','c_source_src','c_pos_src'].forEach(k => {
+    const h = document.createElement('input'); h.type = 'hidden'; h.dataset.key = k; h.value = row[k] || '';
+    wrap.appendChild(h);
+  });
+  // 分类自动补全
+  const old = document.getElementById('catList'); if (old) old.remove();
+  const cats = allCats();
+  if (cats.length) {
+    const d = document.createElement('datalist'); d.id = 'catList';
+    d.innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+    document.body.appendChild(d);
+  }
+}
+function autoPron(wordInput) {
+  const wcol = WORD_COL();
+  if (wordInput.dataset.key !== wcol.key) return;
+  const pronInput = document.querySelector('#formFields [data-key="c_pron"]');
+  if (!pronInput || typeof pinyinPro === 'undefined') return;
+  const word = wordInput.value.trim();
+  const py = pinyinPro.pinyin(word, { toneType: 'symbol', type: 'array' }).filter(Boolean).join(' ');
+  // 仅在读音为空、或仍是上次自动生成时自动填充；手动改过的不再覆盖
+  if (!pronInput.value.trim() || pronInput.dataset.auto === '1') {
+    pronInput.value = py;
+    pronInput.dataset.auto = '1';
+  }
+}
+function fieldEdited(ta) { ta.dataset.auto = '0'; const s = document.querySelector('#formFields [data-key="' + ta.dataset.key + '_src"]'); if (s) s.value = ''; }
+
+/* 内置褒贬词库：词典不提供词性，这里人工维护一份常见成语的褒/贬/中建议（可改、可扩充） */
+const SENTIMENT = {
+  '循天顺人':'褒义词','流转更迭':'中性词','四时八节':'中性词','奇技淫巧':'贬义词','剖玄析微':'褒义词',
+  '画龙点睛':'褒义词','温故知新':'褒义词','卧薪尝胆':'褒义词','一丝不苟':'褒义词','精益求精':'褒义词',
+  '锲而不舍':'褒义词','废寝忘食':'褒义词','专心致志':'褒义词','持之以恒':'褒义词','鞠躬尽瘁':'褒义词',
+  '大公无私':'褒义词','舍己为人':'褒义词','助人为乐':'褒义词','雪中送炭':'褒义词','锦上添花':'褒义词',
+  '见义勇为':'褒义词','足智多谋':'褒义词','才华横溢':'褒义词','博学多才':'褒义词','德高望重':'褒义词',
+  '光明磊落':'褒义词','两袖清风':'褒义词','高风亮节':'褒义词','虚怀若谷':'褒义词','平易近人':'褒义词',
+  '和蔼可亲':'褒义词','任劳任怨':'褒义词','兢兢业业':'褒义词','勤勤恳恳':'褒义词','不屈不挠':'褒义词',
+  '坚韧不拔':'褒义词','勇往直前':'褒义词','临危不惧':'褒义词','镇定自若':'褒义词','集思广益':'褒义词',
+  '举一反三':'褒义词','融会贯通':'褒义词','茅塞顿开':'褒义词','出类拔萃':'褒义词','卓尔不群':'褒义词',
+  '凤毛麟角':'褒义词','举世无双':'褒义词','锦绣前程':'褒义词','鹏程万里':'褒义词','蒸蒸日上':'褒义词',
+  '欣欣向荣':'褒义词','繁荣昌盛':'褒义词','国泰民安':'褒义词','安居乐业':'褒义词','丰衣足食':'褒义词',
+  '政通人和':'褒义词','百废俱兴':'褒义词','焕然一新':'褒义词','井井有条':'褒义词','有条不紊':'褒义词',
+  '胸有成竹':'褒义词','游刃有余':'褒义词','得心应手':'褒义词','炉火纯青':'褒义词','登峰造极':'褒义词',
+  '巧夺天工':'褒义词','鬼斧神工':'褒义词','美不胜收':'褒义词','赏心悦目':'褒义词','心旷神怡':'褒义词',
+  '流连忘返':'褒义词','喜闻乐见':'褒义词','脍炙人口':'褒义词','家喻户晓':'褒义词','妇孺皆知':'褒义词',
+  '闻名遐迩':'褒义词','举世闻名':'褒义词','流芳百世':'褒义词','万古流芳':'褒义词','名垂青史':'褒义词',
+  '永垂不朽':'褒义词','力争上游':'褒义词','发奋图强':'褒义词','自强不息':'褒义词','孜孜不倦':'褒义词',
+  '手不释卷':'褒义词','凿壁偷光':'褒义词','闻鸡起舞':'褒义词','精忠报国':'褒义词','赤胆忠心':'褒义词',
+  '忧国忧民':'褒义词','舍生取义':'褒义词','视死如归':'褒义词','大义凛然':'褒义词','刚正不阿':'褒义词',
+  '铁面无私':'褒义词','公正廉明':'褒义词','廉洁奉公':'褒义词','克己奉公':'褒义词','执法如山':'褒义词',
+  '明察秋毫':'褒义词','料事如神':'褒义词','运筹帷幄':'褒义词','决胜千里':'褒义词','马到成功':'褒义词',
+  '一帆风顺':'褒义词','万事如意':'褒义词','称心如意':'褒义词','心满意足':'褒义词','兴高采烈':'褒义词',
+  '眉开眼笑':'褒义词','欢天喜地':'褒义词','普天同庆':'褒义词','与人为善':'褒义词','宽宏大量':'褒义词',
+  '慷慨解囊':'褒义词','扶危济困':'褒义词','排忧解难':'褒义词',
+  '守株待兔':'贬义词','滥竽充数':'贬义词','掩耳盗铃':'贬义词','自欺欺人':'贬义词','画蛇添足':'贬义词',
+  '杯弓蛇影':'贬义词','草木皆兵':'贬义词','风声鹤唳':'贬义词','狐假虎威':'贬义词','井底之蛙':'贬义词',
+  '夜郎自大':'贬义词','自以为是':'贬义词','刚愎自用':'贬义词','一意孤行':'贬义词','独断专行':'贬义词',
+  '专横跋扈':'贬义词','飞扬跋扈':'贬义词','耀武扬威':'贬义词','盛气凌人':'贬义词','趾高气扬':'贬义词',
+  '目中无人':'贬义词','目空一切':'贬义词','不可一世':'贬义词','骄傲自满':'贬义词','得意忘形':'贬义词',
+  '忘乎所以':'贬义词','沾沾自喜':'贬义词','自鸣得意':'贬义词','班门弄斧':'贬义词','鱼目混珠':'贬义词',
+  '以假乱真':'贬义词','弄虚作假':'贬义词','故弄玄虚':'贬义词','装腔作势':'贬义词','矫揉造作':'贬义词',
+  '阿谀奉承':'贬义词','趋炎附势':'贬义词','见风使舵':'贬义词','两面三刀':'贬义词','口蜜腹剑':'贬义词',
+  '笑里藏刀':'贬义词','阳奉阴违':'贬义词','尔虞我诈':'贬义词','钩心斗角':'贬义词','狼狈为奸':'贬义词',
+  '同流合污':'贬义词','沆瀣一气':'贬义词','臭味相投':'贬义词','一丘之貉':'贬义词','结党营私':'贬义词',
+  '营私舞弊':'贬义词','贪污腐化':'贬义词','贪得无厌':'贬义词','欲壑难填':'贬义词','得寸进尺':'贬义词',
+  '利欲熏心':'贬义词','唯利是图':'贬义词','见利忘义':'贬义词','忘恩负义':'贬义词','恩将仇报':'贬义词',
+  '过河拆桥':'贬义词','落井下石':'贬义词','趁火打劫':'贬义词','浑水摸鱼':'贬义词','不择手段':'贬义词',
+  '心狠手辣':'贬义词','冷酷无情':'贬义词','麻木不仁':'贬义词','玩忽职守':'贬义词','尸位素餐':'贬义词',
+  '碌碌无为':'贬义词','因循守旧':'贬义词','墨守成规':'贬义词','固步自封':'贬义词','抱残守缺':'贬义词',
+  '食古不化':'贬义词','刻舟求剑':'贬义词','缘木求鱼':'贬义词','南辕北辙':'贬义词','徒劳无功':'贬义词',
+  '杯水车薪':'贬义词','画饼充饥':'贬义词','纸上谈兵':'贬义词','华而不实':'贬义词','名不副实':'贬义词',
+  '言过其实':'贬义词','夸大其词':'贬义词','哗众取宠':'贬义词','信口开河':'贬义词','信口雌黄':'贬义词',
+  '颠倒黑白':'贬义词','混淆是非':'贬义词','指鹿为马':'贬义词','造谣惑众':'贬义词','煽风点火':'贬义词',
+  '幸灾乐祸':'贬义词','含沙射影':'贬义词','指桑骂槐':'贬义词','血口喷人':'贬义词','恶语伤人':'贬义词',
+  '出口伤人':'贬义词','尖酸刻薄':'贬义词','无事生非':'贬义词','惹是生非':'贬义词','兴风作浪':'贬义词',
+  '搬弄是非':'贬义词','挑拨离间':'贬义词','无中生有':'贬义词','捕风捉影':'贬义词','道听途说':'贬义词',
+  '以讹传讹':'贬义词','三人成虎':'贬义词','人云亦云':'贬义词','随声附和':'贬义词','鹦鹉学舌':'贬义词',
+  '拾人牙慧':'贬义词','生搬硬套':'贬义词','削足适履':'贬义词','东施效颦':'贬义词','邯郸学步':'贬义词',
+  '数典忘祖':'贬义词','崇洋媚外':'贬义词','奴颜婢膝':'贬义词','卑躬屈膝':'贬义词','丧权辱国':'贬义词',
+  '引狼入室':'贬义词','开门揖盗':'贬义词','养虎为患':'贬义词','放虎归山':'贬义词','贻害无穷':'贬义词',
+  '祸国殃民':'贬义词','误人子弟':'贬义词','为虎作伥':'贬义词','助纣为虐':'贬义词','草菅人命':'贬义词',
+  '滥杀无辜':'贬义词','丧尽天良':'贬义词','丧心病狂':'贬义词','惨无人道':'贬义词','暴殄天物':'贬义词',
+  '挥霍无度':'贬义词','骄奢淫逸':'贬义词','穷奢极欲':'贬义词','纸醉金迷':'贬义词','醉生梦死':'贬义词',
+  '胡作非为':'贬义词','为非作歹':'贬义词','横行霸道':'贬义词','作威作福':'贬义词','敲诈勒索':'贬义词',
+  '巧取豪夺':'贬义词','横征暴敛':'贬义词','不逞之徒':'贬义词','互相标榜':'贬义词','趋时附势':'贬义词',
+  '水到渠成':'中性词','顺理成章':'中性词','相辅相成':'中性词','相得益彰':'中性词','相映成趣':'中性词',
+  '相形见绌':'中性词','不言而喻':'中性词','显而易见':'中性词','众所周知':'中性词','一目了然':'中性词',
+  '了如指掌':'中性词','一清二楚':'中性词','原原本本':'中性词','历历在目':'中性词','记忆犹新':'中性词',
+  '念念不忘':'中性词','难以忘怀':'中性词','口若悬河':'中性词','滔滔不绝':'中性词','侃侃而谈':'中性词',
+  '娓娓道来':'中性词','绘声绘色':'中性词','有声有色':'中性词','活灵活现':'中性词','栩栩如生':'中性词',
+  '惟妙惟肖':'中性词','呼之欲出':'中性词','跃然纸上':'中性词','淋漓尽致':'中性词','入木三分':'中性词',
+  '力透纸背':'中性词','一针见血':'中性词','开门见山':'中性词','直截了当':'中性词','言简意赅':'中性词',
+  '简明扼要':'中性词','长篇大论':'中性词','连篇累牍':'中性词','老生常谈':'中性词','千篇一律':'中性词',
+  '七零八落':'中性词','支离破碎':'中性词','分崩离析':'中性词','土崩瓦解':'中性词','四分五裂':'中性词',
+  '一盘散沙':'中性词','各自为政':'中性词','按部就班':'中性词','循序渐进':'中性词','自然而然':'中性词',
+  '顺其自然':'中性词','水落石出':'中性词','真相大白':'中性词','原形毕露':'中性词','尘埃落定':'中性词'
+};
+/* 词库第二批扩充（常见成语，约 260 条，可继续累加） */
+const SENTIMENT_EXT = {
+  '勤奋好学':'褒义词','业精于勤':'褒义词','勤能补拙':'褒义词','囊萤映雪':'褒义词','牛角挂书':'褒义词','韦编三绝':'褒义词','程门立雪':'褒义词','全神贯注':'褒义词','聚精会神':'褒义词','心无旁骛':'褒义词','脚踏实地':'褒义词','埋头苦干':'褒义词','披星戴月':'褒义词','起早贪黑':'褒义词','夙兴夜寐':'褒义词','夜以继日':'褒义词','争分夺秒':'褒义词','分秒必争':'褒义词','奋起直追':'褒义词','迎头赶上':'褒义词','后来居上':'褒义词','青出于蓝':'褒义词','后起之秀':'褒义词','栋梁之材':'褒义词','中流砥柱':'褒义词','顶天立地':'褒义词','铁骨铮铮':'褒义词','宁死不屈':'褒义词','威武不屈':'褒义词','坚贞不屈':'褒义词','冰清玉洁':'褒义词','一尘不染':'褒义词','天下为公':'褒义词','先公后私':'褒义词','死而后已':'褒义词','呕心沥血':'褒义词','苦心孤诣':'褒义词','忠于职守':'褒义词','尽职尽责':'褒义词','十全十美':'褒义词','完美无缺':'褒义词','无懈可击':'褒义词','滴水不漏':'褒义词','天衣无缝':'褒义词','浑然天成':'褒义词','精彩绝伦':'褒义词','出神入化':'褒义词','笔走龙蛇':'褒义词','龙飞凤舞':'褒义词','行云流水':'褒义词','引人入胜':'褒义词','扣人心弦':'褒义词','荡气回肠':'褒义词','余音绕梁':'褒义词','耐人寻味':'褒义词','意味深长':'褒义词','发人深省':'褒义词','振聋发聩':'褒义词','醍醐灌顶':'褒义词','恍然大悟':'褒义词','豁然开朗':'褒义词','柳暗花明':'褒义词','峰回路转':'褒义词','绝处逢生':'褒义词','化险为夷':'褒义词','转危为安':'褒义词','逢凶化吉':'褒义词','否极泰来':'褒义词','苦尽甘来':'褒义词','雨过天晴':'褒义词','时来运转':'褒义词','平安无事':'褒义词','安然无恙':'褒义词','完好无损':'褒义词','十拿九稳':'褒义词','万无一失':'褒义词','胜券在握':'褒义词','大功告成':'褒义词','功成名就':'褒义词','飞黄腾达':'褒义词','平步青云':'褒义词','青云直上':'褒义词','日新月异':'褒义词','一日千里':'褒义词','突飞猛进':'褒义词','扶摇直上':'褒义词','更上一层楼':'褒义词','如虎添翼':'褒义词','济困扶危':'褒义词','救死扶伤':'褒义词','治病救人':'褒义词','妙手回春':'褒义词','起死回生':'褒义词','手到病除':'褒义词','立竿见影':'褒义词','事半功倍':'褒义词','一举两得':'褒义词','一箭双雕':'褒义词','两全其美':'褒义词','一本万利':'褒义词','物美价廉':'褒义词','货真价实':'褒义词','童叟无欺':'褒义词','一诺千金':'褒义词','言而有信':'褒义词','言出必行':'褒义词','表里如一':'褒义词','言行一致':'褒义词','堂堂正正':'褒义词','开诚布公':'褒义词','推心置腹':'褒义词','肝胆相照':'褒义词','患难与共':'褒义词','同舟共济':'褒义词','和衷共济':'褒义词','万众一心':'褒义词','众志成城':'褒义词','风雨同舟':'褒义词','守望相助':'褒义词','成人之美':'褒义词','乐善好施':'褒义词','侠肝义胆':'褒义词','义薄云天':'褒义词','挺身而出':'褒义词','赴汤蹈火':'褒义词','出生入死':'褒义词','舍生忘死':'褒义词','一往无前':'褒义词','冲锋陷阵':'褒义词','身先士卒':'褒义词','奋不顾身':'褒义词','义无反顾':'褒义词','当仁不让':'褒义词','责无旁贷':'褒义词','义不容辞':'褒义词','忠心耿耿':'褒义词','碧血丹心':'褒义词','披肝沥胆':'褒义词','公正无私':'褒义词','公平正直':'褒义词','秉公执法':'褒义词','明镜高悬':'褒义词','火眼金睛':'褒义词','慧眼识珠':'褒义词','独具慧眼':'褒义词','明察暗访':'褒义词','爱民如子':'褒义词','解民倒悬':'褒义词','先忧后乐':'褒义词','保家卫国':'褒义词','为国捐躯':'褒义词','马革裹尸':'褒义词','赤子之心':'褒义词','聪明伶俐':'褒义词','聪明睿智':'褒义词','大智若愚':'褒义词','神机妙算':'褒义词','先见之明':'褒义词','远见卓识':'褒义词','高瞻远瞩':'褒义词','深谋远虑':'褒义词','老谋深算':'褒义词','成竹在胸':'褒义词','心中有数':'褒义词','真知灼见':'褒义词','博学多闻':'褒义词','博古通今':'褒义词','学富五车':'褒义词','才高八斗':'褒义词','满腹经纶':'褒义词','出口成章':'褒义词','下笔成章':'褒义词','妙笔生花':'褒义词','文采飞扬':'褒义词','才思敏捷':'褒义词','七步成诗':'褒义词','触类旁通':'褒义词','闻一知十':'褒义词','心领神会':'褒义词','灵机一动':'褒义词','急中生智':'褒义词','随机应变':'褒义词','临机应变':'褒义词','应付自如':'褒义词','对答如流':'褒义词','娓娓动听':'褒义词','生动形象':'褒义词','感人肺腑':'褒义词','可歌可泣':'褒义词','感人至深':'褒义词','公而忘私':'褒义词','舍己救人':'褒义词','杀身成仁':'褒义词','见危授命':'褒义词','以身殉职':'褒义词','德艺双馨':'褒义词','功德无量':'褒义词','丰功伟绩':'褒义词','汗马功劳':'褒义词','劳苦功高':'褒义词',
+  '自不量力':'贬义词','螳臂当车':'贬义词','蚍蜉撼树':'贬义词','痴人说梦':'贬义词','白日做梦':'贬义词','黄粱一梦':'贬义词','空中楼阁':'贬义词','镜花水月':'贬义词','海市蜃楼':'贬义词','虚无缥缈':'贬义词','子虚乌有':'贬义词','处心积虑':'贬义词','费尽心机':'贬义词','挖空心思':'贬义词','自相矛盾':'贬义词','漏洞百出':'贬义词','破绽百出':'贬义词','出尔反尔':'贬义词','言而无信':'贬义词','背信弃义':'贬义词','卖友求荣':'贬义词','认贼作父':'贬义词','养痈遗患':'贬义词','纵虎归山':'贬义词','后患无穷':'贬义词','祸起萧墙':'贬义词','同室操戈':'贬义词','自相残杀':'贬义词','骨肉相残':'贬义词','煮豆燃萁':'贬义词','相煎太急':'贬义词','貌合神离':'贬义词','同床异梦':'贬义词','口是心非':'贬义词','言不由衷':'贬义词','绵里藏针':'贬义词','佛口蛇心':'贬义词','人面兽心':'贬义词','狼心狗肺':'贬义词','蛇蝎心肠':'贬义词','伤天害理':'贬义词','天理难容':'贬义词','罪大恶极':'贬义词','十恶不赦':'贬义词','死有余辜':'贬义词','恶贯满盈':'贬义词','罄竹难书':'贬义词','擢发难数':'贬义词','罪恶滔天':'贬义词','作恶多端':'贬义词','无恶不作':'贬义词','罪行累累':'贬义词','怙恶不悛':'贬义词','顽固不化':'贬义词','执迷不悟':'贬义词','死不悔改':'贬义词','屡教不改':'贬义词',
+  '毋庸置疑':'中性词','不容置疑':'中性词','千真万确':'中性词','确凿不移':'中性词','铁证如山':'中性词','有目共睹':'中性词','耳熟能详':'中性词','司空见惯':'中性词','屡见不鲜':'中性词','习以为常':'中性词','见怪不怪':'中性词','不足为奇':'中性词','家常便饭':'中性词','比比皆是':'中性词','俯拾皆是':'中性词','多如牛毛':'中性词','不计其数':'中性词','数不胜数':'中性词','车载斗量':'中性词','浩如烟海':'中性词','不胜枚举':'中性词','举不胜举':'中性词','不一而足':'中性词','形形色色':'中性词','林林总总':'中性词','五花八门':'中性词','五光十色':'中性词','千变万化':'中性词','变化多端':'中性词','瞬息万变':'中性词','白云苍狗':'中性词','沧海桑田':'中性词','时过境迁':'中性词','物是人非':'中性词','沧海一粟':'中性词','九牛一毛':'中性词','微乎其微':'中性词','微不足道':'中性词','寥寥无几':'中性词','屈指可数':'中性词','寥若晨星':'中性词','绝无仅有':'中性词','空前绝后':'中性词','史无前例':'中性词','亘古未有':'中性词','前所未有':'中性词','破天荒':'中性词','开天辟地':'中性词','继往开来':'中性词','承前启后':'中性词','承上启下':'中性词','总而言之':'中性词','归根结底':'中性词','换言之':'中性词','可想而知':'中性词','各种各样':'中性词'
+};
+Object.assign(SENTIMENT, SENTIMENT_EXT);
+
+/* 词典懒加载（录入弹窗打开时才取，避免启动卡顿） */
+let __idiomLoaded = false;
+async function ensureIdiom() {
+  if (__idiomLoaded) return;
+  __idiomLoaded = true;
+  try { const r = await fetch('idiom.json'); window.__idiomMap = await r.json(); }
+  catch (e) { window.__idiomMap = null; }
+}
+/* 根据词语从本地词典/词库填充 含义/例句/来源/词性（同步，需在 ensureIdiom 之后调用） */
+function fillFromDict(word) {
+  if (!window.__idiomMap) return;  // 词典尚未加载完成，跳过，避免误清空已填内容
+  const rec = (word) ? window.__idiomMap[word] : null;
+  const setF = (key, val, src) => {
+    const el = document.querySelector('#formFields [data-key="' + key + '"]');
+    const sh = document.querySelector('#formFields [data-key="' + key + '_src"]');
+    if (!el) return;
+    if (el.dataset.auto === '0') return;            // 用户手动改过，保留
+    if (val) { el.value = val; el.dataset.auto = '1'; if (sh) sh.value = src; }
+    else if (el.dataset.auto === '1') { el.value = ''; if (sh) sh.value = ''; }
+  };
+  if (rec) {
+    const ex = rec.x ? rec.x.replace(/～/g, word) : '';
+    const so = rec.s ? rec.s.replace(/^[“‘]+|[”’]+$/g, '') : '';
+    setF('c_mean', rec.e, '成语词典');
+    if (ex) setF('c_example', ex, '成语词典·例句');
+    if (so) setF('c_source', so, '成语词典·出处');
+  } else {
+    setF('c_mean', '', null); setF('c_example', '', null); setF('c_source', '', null);
+  }
+  const posEl = document.querySelector('#formFields [data-key="c_pos"]');
+  const psh = document.querySelector('#formFields [data-key="c_pos_src"]');
+  if (posEl && psh && posEl.dataset.auto !== '0') {
+    const sp = SENTIMENT[word];
+    if (sp) { posEl.value = sp; posEl.dataset.auto = '1'; psh.value = '内置褒贬词库'; }
+    else if (posEl.dataset.auto === '1') { posEl.value = ''; psh.value = ''; }
+  }
+}
+/* 打字时实时触发（带防抖）；失焦再兜底一次 */
+let __meanTimer = null;
+function autoMeanDebounced(el) { clearTimeout(__meanTimer); __meanTimer = setTimeout(() => autoMean(el), 320); }
+async function autoMean(wordInput) {
+  const wcol = WORD_COL();
+  if (wordInput.dataset.key !== wcol.key) return;
+  await ensureIdiom();
+  fillFromDict(wordInput.value.trim());
+}
+/* 当前录入条目：点「自动补全」按钮，针对这一条词语补含义/例句/来源/词性，查不到的留空 */
+async function fillCurrent() {
+  const wf = document.querySelector('#formFields [data-key="' + WORD_COL().key + '"]');
+  if (!wf) return;
+  const w = wf.value.trim();
+  if (!w) { toast('请先输入词语'); return; }
+  await ensureIdiom();
+  if (!window.__idiomMap) { toast('词典加载失败，请稍后重试'); return; }
+  fillFromDict(w);
+  toast('已补全（查不到的字段留空）');
+}
+function saveEntry() {
+  // 保存前兜底补一次自动生成（即便用户没让词语框失焦直接保存）
+  const wf = document.querySelector('#formFields [data-key="' + WORD_COL().key + '"]');
+  if (wf) fillFromDict(wf.value.trim());
+  const data = {};
+  document.querySelectorAll('#formFields [data-key]').forEach(el => data[el.dataset.key] = el.value.trim());
+  const wcol = WORD_COL();
+  if (!data[wcol.key]) { toast(`「${wcol.name}」不能为空`); return; }
+  if (editingIndex === null) { data.id = genId(); state.rows.unshift(data); cur = 0; }
+  else { data.id = state.rows[editingIndex].id || genId(); state.rows[editingIndex] = data; }
+  closeModal('entryModal'); refresh(); toast('已保存 ✓');
+}
+function deleteRow(idx) {
+  if (!confirm('确定删除这条记录吗？')) return;
+  const rid = state.rows[idx] && state.rows[idx].id;
+  state.rows.splice(idx, 1);
+  if (rid) state.discrim.forEach(g => { g.items = g.items.filter(id => id !== rid); });
+  if (cur >= state.rows.length) cur = state.rows.length - 1;
+  refresh(); renderList(); toast('已删除');
+}
+function refresh() { save(); buildDeck(); }
+
+/* 栏目管理 */
+function openColModal() {
+  const list = document.getElementById('colList'); list.innerHTML = '';
+  state.cols.forEach(c => {
+    const item = document.createElement('div'); item.className = 'col-item';
+    item.innerHTML = `<input type="text" value="${esc(c.name)}" data-key="${c.key}" ${c.required?'disabled':''}>
+      ${c.required ? '<span class="req-tag">必需</span>' : `<button class="del-col" onclick="deleteCol('${c.key}')">✕</button>`}`;
+    item.querySelector('input').addEventListener('change', e => {
+      const col = state.cols.find(x => x.key === c.key); if (col) { col.name = e.target.value.trim() || col.name; refresh(); }
+    });
+    list.appendChild(item);
+  });
+  show('colModal');
+}
+function addColumn() {
+  const input = document.getElementById('newColName'); const name = input.value.trim();
+  if (!name) { toast('请输入栏目名称'); return; }
+  if (state.cols.some(c => c.name === name)) { toast('栏目已存在'); return; }
+  state.cols.push({ key: 'c_' + Date.now(), name });
+  input.value = ''; openColModal(); refresh(); toast('栏目已添加');
+}
+function deleteCol(key) {
+  const col = state.cols.find(c => c.key === key);
+  if (!confirm(`删除栏目「${col.name}」？该栏目内容将一并删除。`)) return;
+  state.cols = state.cols.filter(c => c.key !== key);
+  state.rows.forEach(r => delete r[key]);
+  openColModal(); refresh();
+}
+
+/* 通用 */
+/* 统一返回栈：所有弹窗与全屏视图都支持 点返回按钮、手机左滑后退手势、设备物理返回键 */
+let overlayStack = [];
+function pushOverlay(id) { overlayStack.push(id); history.pushState({ ov: id }, ''); }
+function show(id) {
+  document.getElementById(id).classList.add('show');
+  if (!overlayStack.includes(id)) pushOverlay(id);
+}
+function closeModal(id) {
+  const idx = overlayStack.lastIndexOf(id);
+  if (idx > -1 && idx === overlayStack.length - 1) { history.back(); return; } // popstate 统一收尾
+  if (idx > -1) overlayStack.splice(idx, 1);
+  document.getElementById(id).classList.remove('show'); save();
+}
+function closeTopOverlay() {
+  if (!overlayStack.length) return;
+  const id = overlayStack.pop();
+  const el = document.getElementById(id);
+  if (el) { el.classList.remove('show'); save(); }
+}
+window.addEventListener('popstate', closeTopOverlay);
+
+/* 右上角收纳菜单：点击 ⋯ 展开/收起，点其他区域自动收起 */
+function toggleTopMenu(e) { e.stopPropagation(); document.getElementById('topMenu').classList.toggle('open'); }
+function closeTopMenu() { const m = document.getElementById('topMenu'); if (m) m.classList.remove('open'); }
+document.addEventListener('click', e => { if (!e.target.closest('.top-actions')) closeTopMenu(); });
+document.querySelectorAll('.modal-mask').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); }));
+document.addEventListener('keydown', e => {
+  if (document.getElementById('listView').classList.contains('show')) return;
+  if (document.getElementById('discrimView').classList.contains('show')) return;
+  if (document.querySelector('.modal-mask.show')) return;
+  if (e.key === 'ArrowRight') next();
+  if (e.key === 'ArrowLeft') prev();
+});
+
+/* 云同步：GitHub Gist（浏览器直连） */
+const GIST_TOKEN_KEY = 'gw_gist_token';
+const GIST_ID_KEY = 'gw_gist_id';
+function openCloudModal() {
+  document.getElementById('gistToken').value = localStorage.getItem(GIST_TOKEN_KEY) || '';
+  document.getElementById('gistId').value = localStorage.getItem(GIST_ID_KEY) || '';
+  show('cloudModal');
+}
+async function gistReq(method, url, token, body) {
+  const opt = { method, headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' } };
+  if (body) opt.body = JSON.stringify(body);
+  const res = await fetch(url, opt);
+  if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 120));
+  return res.json();
+}
+async function cloudUpload() {
+  const token = document.getElementById('gistToken').value.trim();
+  if (!token) { toast('请先填写 GitHub Token'); return; }
+  const id = document.getElementById('gistId').value.trim();
+  const content = JSON.stringify(state, null, 2);
+  const payload = { description: '好词好句收集本 云备份', public: false, files: { 'goodwords.json': { content } } };
+  try {
+    let r;
+    if (id) r = await gistReq('PATCH', `https://api.github.com/gists/${id}`, token, payload);
+    else r = await gistReq('POST', 'https://api.github.com/gists', token, payload);
+    localStorage.setItem(GIST_TOKEN_KEY, token);
+    localStorage.setItem(GIST_ID_KEY, r.id);
+    document.getElementById('gistId').value = r.id;
+    toast('已上传到云端 ✓');
+  } catch (e) {
+    console.error(e);
+    let msg = e.message;
+    if (id && /404/.test(msg)) msg = 'Gist ID 无效或不存在，请清空「Gist ID」框后重新上传';
+    toast('上传失败：' + msg);
+  }
+}
+async function cloudDownload() {
+  const token = document.getElementById('gistToken').value.trim();
+  const id = document.getElementById('gistId').value.trim();
+  if (!token || !id) { toast('请填写 Token 和 Gist ID'); return; }
+  try {
+    const r = await gistReq('GET', `https://api.github.com/gists/${id}`, token);
+    const f = r.files && r.files['goodwords.json'];
+    if (!f) { toast('该 Gist 中没有 goodwords.json'); return; }
+    const s = JSON.parse(f.content);
+    if (Array.isArray(s.cols) && Array.isArray(s.rows)) { state = s; save(); buildDeck(); toast('已从云端恢复 ✓'); }
+    else toast('数据格式不正确');
+  } catch (e) { console.error(e); toast('下载失败：' + e.message); }
+}
+
+/* 本地文件备份（可手动存到夸克网盘） */
+function downloadFile(content, filename, type) {
+  const blob = new Blob([content], { type: type + ';charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function exportJSON() { downloadFile(JSON.stringify(state, null, 2), '好词好句备份.json', 'application/json'); toast('已导出文件'); }
+function importJSON(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const s = JSON.parse(e.target.result);
+      if (Array.isArray(s.cols) && Array.isArray(s.rows)) { if (!confirm('导入将覆盖当前数据，是否继续？')) return; state = s; save(); buildDeck(); toast('导入成功 ✓'); }
+      else toast('文件格式不正确');
+    } catch (err) { toast('文件解析失败'); }
+  };
+  reader.readAsText(file); input.value = '';
+}
+
+/* 连连看小游戏 */
+let gameTiles = [];
+function openGame() {
+  // 准备分类下拉（录入时用）
+  const dl = document.getElementById('catList'); if (dl) dl.remove();
+  const cats = allCats();
+  if (cats.length) {
+    const d = document.createElement('datalist'); d.id = 'catList';
+    d.innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+    document.body.appendChild(d);
+  }
+  show('gameModal'); startGame();
+}
+function startGame() {
+  const wcol = WORD_COL();
+  const pairs = state.rows
+    .map(r => ({ w: (r[wcol.key] || '').trim(), m: (r.c_mean || '').trim() }))
+    .filter(p => p.w && p.m);
+  const board = document.getElementById('gameBoard');
+  const win = document.getElementById('gameWin');
+  const empty = document.getElementById('gameEmpty');
+  win.style.display = 'none';
+  if (pairs.length < 3) { board.innerHTML = ''; empty.style.display = 'block'; document.getElementById('gameStat').textContent = '已配对 0 / 0'; return; }
+  empty.style.display = 'none';
+  // 每个词拆成两张牌：词语牌 + 含义牌
+  let tiles = [];
+  pairs.forEach((p, idx) => {
+    tiles.push({ id: idx + 'w', kind: 'w', text: p.w, pair: idx });
+    tiles.push({ id: idx + 'm', kind: 'm', text: p.m, pair: idx });
+  });
+  for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
+  gameTiles = tiles;
+  pairedCount = 0;
+  board.innerHTML = tiles.map(t => `<div class="gtile ${t.kind === 'w' ? 'word' : ''}" data-id="${t.id}" onclick="pickTile(this)">${esc(t.text)}</div>`).join('');
+  document.getElementById('gameStat').textContent = `已配对 0 / ${pairs.length}`;
+}
+let selTiles = [];
+let pairedCount = 0;
+function pickTile(el) {
+  if (el.classList.contains('gone') || el.classList.contains('sel')) return;
+  el.classList.add('sel');
+  selTiles.push(el);
+  if (selTiles.length === 2) {
+    const [a, b] = selTiles;
+    const ta = gameTiles.find(t => t.id === a.dataset.id);
+    const tb = gameTiles.find(t => t.id === b.dataset.id);
+    if (ta && tb && ta.pair === tb.pair && ta.kind !== tb.kind) {
+      drawLink(a, b);
+      pairedCount++;
+      const total = gameTiles.length / 2;
+      document.getElementById('gameStat').textContent = `已配对 ${pairedCount} / ${total}`;
+      setTimeout(() => { a.classList.add('gone'); b.classList.add('gone'); }, 260);
+      if (pairedCount === total) setTimeout(() => { document.getElementById('gameWin').style.display = 'block'; }, 320);
+    } else {
+      a.classList.add('bad'); b.classList.add('bad');
+      setTimeout(() => { a.classList.remove('sel','bad'); b.classList.remove('sel','bad'); }, 380);
+    }
+    selTiles = [];
+  }
+}
+function drawLink(a, b) {
+  const board = document.getElementById('gameBoard');
+  const ar = a.getBoundingClientRect(), br = b.getBoundingClientRect(), pr = board.getBoundingClientRect();
+  const x1 = ar.left + ar.width/2 - pr.left, y1 = ar.top + ar.height/2 - pr.top;
+  const x2 = br.left + br.width/2 - pr.left, y2 = br.top + br.height/2 - pr.top;
+  const line = document.createElement('div');
+  line.className = 'game-link';
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  line.style.left = x1 + 'px'; line.style.top = y1 + 'px';
+  line.style.width = len + 'px';
+  line.style.transform = `rotate(${Math.atan2(y2 - y1, x2 - x1)}rad)`;
+  board.appendChild(line);
+  setTimeout(() => line.remove(), 500);
+}
+
+/* 词语辨析模块 */
+let currentGroupId = null;
+function openDiscrim() { renderDiscrim(); document.getElementById('discrimView').classList.add('show'); pushOverlay('discrimView'); }
+function closeDiscrim() { if (overlayStack[overlayStack.length-1]==='discrimView') history.back(); else document.getElementById('discrimView').classList.remove('show'); }
+function renderDiscrim() {
+  const wrap = document.getElementById('discrimList');
+  const wcol = WORD_COL();
+  if (state.discrim.length === 0) {
+    wrap.innerHTML = '<div class="list-empty">还没有辨析组。<br>点上方「＋ 新建辨析组」，把容易混淆的成语归到一起对比记忆吧。</div>';
+    return;
+  }
+  wrap.innerHTML = state.discrim.map(g => {
+    const items = g.items.map(rid => state.rows.find(r => r.id === rid)).filter(Boolean);
+    const cards = items.length ? items.map(r => {
+      const word = esc(r[wcol.key] || '（未命名）');
+      const pos = esc(r.c_pos || '');
+      const pron = esc(r.c_pron || '');
+      const mean = esc(r.c_mean || '');
+      const posClass = pos.includes('褒') ? 'pos-good' : pos.includes('贬') ? 'pos-bad' : pos.includes('中') ? 'pos-mid' : '';
+      return `<div class="disc-card">
+        <div class="disc-card-word">${word}${pos ? `<span class="mc-pos ${posClass}">${pos}</span>` : ''}</div>
+        ${pron ? `<div class="disc-card-pron">${pron}</div>` : ''}
+        <div class="disc-card-mean">${mean || '（无含义）'}</div>
+        <button class="disc-remove" title="移出本组" onclick="removeFromGroup('${g.id}','${r.id}')">✕</button>
+      </div>`;
+    }).join('') : '<div class="list-empty" style="padding:20px;">该组还没有成语，点「＋ 添加成语」加入。</div>';
+    return `<div class="disc-group">
+      <div class="disc-group-head">
+        <h3>📑 ${esc(g.name)}</h3>
+        <div class="disc-group-actions">
+          <button class="btn-ghost btn-sm" onclick="openPicker('${g.id}')">＋ 添加成语</button>
+          <button class="btn-ghost btn-sm" onclick="renameGroup('${g.id}')">✎ 重命名</button>
+          <button class="btn-ghost btn-sm del" onclick="deleteGroup('${g.id}')">🗑 删除</button>
+        </div>
+      </div>
+      <div class="disc-items">${cards}</div>
+    </div>`;
+  }).join('');
+}
+function newGroup() {
+  const name = prompt('请输入辨析组名称，例如「容易混淆的成语」「近义成语对比」：');
+  if (!name || !name.trim()) return;
+  state.discrim.push({ id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name: name.trim(), items: [] });
+  save(); renderDiscrim(); toast('已新建辨析组');
+}
+function renameGroup(gid) {
+  const g = state.discrim.find(x => x.id === gid); if (!g) return;
+  const name = prompt('重命名辨析组：', g.name);
+  if (name && name.trim()) { g.name = name.trim(); save(); renderDiscrim(); }
+}
+function deleteGroup(gid) {
+  const g = state.discrim.find(x => x.id === gid); if (!g) return;
+  if (!confirm(`删除辨析组「${g.name}」？`)) return;
+  state.discrim = state.discrim.filter(x => x.id !== gid);
+  save(); renderDiscrim(); toast('已删除');
+}
+function removeFromGroup(gid, rid) {
+  const g = state.discrim.find(x => x.id === gid); if (!g) return;
+  g.items = g.items.filter(id => id !== rid);
+  save(); renderDiscrim();
+}
+function openPicker(gid) {
+  currentGroupId = gid;
+  const inp = document.getElementById('pickerSearch'); if (inp) inp.value = '';
+  renderPicker();
+  show('pickerModal');
+}
+function renderPicker() {
+  const box = document.getElementById('pickerList');
+  const q = (document.getElementById('pickerSearch').value || '').trim().toLowerCase();
+  const g = state.discrim.find(x => x.id === currentGroupId);
+  const wcol = WORD_COL();
+  let rows = state.rows.map((r, i) => ({ r, i }));
+  if (q) rows = rows.filter(({ r }) => state.cols.some(c => String(r[c.key] || '').toLowerCase().includes(q)));
+  if (rows.length === 0) { box.innerHTML = '<div class="list-empty" style="padding:24px;">没有匹配的词语</div>'; return; }
+  box.innerHTML = rows.map(({ r }) => {
+    const word = esc(r[wcol.key] || '（未命名）');
+    const mean = esc(r.c_mean || '');
+    const added = g ? g.items.includes(r.id) : false;
+    return `<div class="picker-item ${added ? 'added' : ''}" onclick="togglePick('${r.id}')">
+      <div class="pi-word">${word}</div>
+      <div class="pi-mean">${mean}</div>
+      <div class="pi-check">${added ? '✓ 已加入' : '＋ 加入'}</div>
+    </div>`;
+  }).join('');
+}
+function togglePick(rid) {
+  const g = state.discrim.find(x => x.id === currentGroupId); if (!g) return;
+  if (g.items.includes(rid)) g.items = g.items.filter(id => id !== rid);
+  else g.items.push(rid);
+  save(); renderPicker();
+}
+
+/* 注册 Service Worker（离线可用 / 可安装） */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+renderDeck();
+buildDeck();
+// 词典改为录入时懒加载（ensureIdiom），此处不再启动时拉取 7MB 文件
+
+/* 加载离线成语释义词典（打包在本地，无网也可用） */
+fetch('idiom.json').then(r => r.json()).then(d => { window.__idiomMap = d; }).catch(() => { window.__idiomMap = null; });
+</script>
+</body>
+</html>
